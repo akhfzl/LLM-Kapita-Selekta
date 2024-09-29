@@ -1,6 +1,7 @@
 from utils.dataPrep import DataPreparation
 from transformers import GPT2Tokenizer
 import os 
+from dataset import Datasets
 
 class DataPreprocess(DataPreparation):
     def __init__(self, oldfolder, newfolder):
@@ -10,54 +11,46 @@ class DataPreprocess(DataPreparation):
         # variable
         self.new_folder = newfolder 
         self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        self.tokenizer.pad_token = self.tokenizer.eos_token
     
     # formula memecah splitting
-    def wayOfSplitting(df):
+    def wayOfSplitting(self, df):
         test_size =  round(len(df) * 0.2)
-        train, test = df[(len(df) - test_size): ], df[:(len(df) - test_size)]
-        return train, test
+        val, train = df[(len(df) - test_size): ], df[:(len(df) - test_size)]
+        return train, val
 
     # memisahkan train-test
-    def trainTestSplit(self, file):
-        df = self.fileAsDataframe(file, 'csv')
-        train, test = self.wayOfSplitting(df)
+    def trainTestSplit(self, isLarge=True):
+        typeOfProcess = 'large' if isLarge else 'small'
+        self.model_type = typeOfProcess
+        
+        df = self.selectSmallOrLarge(typeOfProcess)
+        selectFeature = df[['isi']].values
 
-        return train, test 
+        train, val = self.wayOfSplitting(selectFeature)
+
+        return train, val 
     
     # fungsi tokenisasi
-    def tokenisasi(self, text):
-        # inisialisasi token dan assign variable token
-        self.tokenizer.add_special_tokens({'bos_token': '[BOS]'})
-        bos_token_id = self.tokenizer.bos_token_id
-        eos_token_id = self.tokenizer.eos_token_id
-
-        # tokenisasi manual teks
-        input_ids = [bos_token_id] + self.tokenizer.encode(text) + [eos_token_id]
-
-        return input_ids 
-
+    def tokenisasi(self, mydict):
+        inputs = self.tokenizer(mydict["text"], padding="max_length", truncation=True, return_tensors='pt')
+        inputs['labels'] = inputs['input_ids']  # Set labels to be the same as input_ids
+        return inputs
 
     # main fungsi tokenisasi
-    def mainTokenise(self, singleInput='', multiInput=[]):
-        inputs = ''
-        input_ids = ''
-
-        if singleInput:
-            inputs = singleInput
-
-            input_ids = self.tokenisasi(inputs)
-
-        elif multiInput:
-            inputs = multiInput
-            input_ids = [self.tokenisasi(inp) for inp in inputs]
-
+    def mainTokenise(self, multiInput):
+        datasets = None
+        if all(isinstance(item, list) and len(item) > 0 for item in multiInput):
+            datasets = Dataset.from_dict({'text': multiInput})
         else:
-            raise 'Please give function single or multi input'
+            flatenning = [item[0] for item in multiInput]
+            datasets = Dataset.from_dict({"text": flatenning})
         
-        return inputs, input_ids
-
-
-
-
+        tokenisasi = datasets.map(self.tokenisasi, batched=True)
+        tokenisasi.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
         
-
+        return tokenisasi
+        
+    
+    def decode_tokenizer(self, ids):
+        return tokenizer.decode(ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)

@@ -2,15 +2,32 @@ import pandas as pd, os
 import numpy as np
 
 class DataPreparation:
-    def __init__(self, pathFolder):
+    def __init__(self, pathFolder=None):
         self.folder = pathFolder
 
     # membuka folder dan list
-    def openFolder(self):
+    def openFolder(self, folderpath=None):
+        if not folderpath:
+            folderpath = self.folder 
+
         try:
-            return [f'{self.folder}/{fname}' for fname in os.listdir(self.folder)]
+            return os.listdir(folderpath)
         except:
             print('The pathFolder of class object should be filled')
+    
+    # memilih file small or large dataset
+    def selectSmallOrLarge(self, isSmallOrLarge='large'):
+        checkFolder = self.openFolder('/kaggle/input/llm-pretrained/new_dataset')
+
+        if isSmallOrLarge == 'large' and 'large_corpus.csv' in checkFolder:
+            return pd.read_csv(os.path.join('/kaggle/input/llm-pretrained/new_dataset', 'large_corpus.csv'))
+        
+        elif isSmallOrLarge == 'small' and 'small_corpus.csv' in checkFolder:
+            return pd.read_csv(os.path.join('/kaggle/input/llm-pretrained/new_dataset', 'small_corpus.csv'))
+        
+        else:
+            print('Please check your file')
+            pass
     
     # membaca file
     def fileAsDataframe(self, filename, filetype='json'):

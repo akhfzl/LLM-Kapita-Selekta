@@ -65,6 +65,7 @@ class DataModeling(DataPreprocess):
             output_dir=output_dir,
             evaluation_strategy=evaluation_strategy,
             learning_rate=lr,
+            save_steps='epoch',
             per_device_train_batch_size=num_batch,
             per_device_eval_batch_size=num_batch,
             num_train_epochs=epoch,
@@ -81,3 +82,29 @@ class DataModeling(DataPreprocess):
         trainer.train() 
         
         return trainer
+    
+    def testModel(self, dir, input_text):
+        # Load the fine-tuned GPT-2 model and tokenizer
+        model = GPT2LMHeadModel.from_pretrained(dir)
+        tokenizer = GPT2Tokenizer.from_pretrained(dir)
+        tokenizer.pad_token = tokenizer.eos_token
+
+        # Send the model to the GPU (if available)
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        model.to(device)
+
+        input_ids = tokenizer(input_text, return_tensors='pt').to(device)
+
+        output = model.generate(
+            input_ids['input_ids'],
+            max_length=100,  
+            num_return_sequences=1,  # Number of sequences to generate
+            no_repeat_ngram_size=2,  # To avoid repeating n-grams
+            early_stopping=True,
+            attention_mask=input_ids['attention_mask'],
+            pad_token_id=tokenizer.pad_token_id 
+        )
+
+        output_text = tokenizer.decode(output[0], skip_special_tokens=True)
+
+        return f'Generate text: {output_text}'
